@@ -1,0 +1,202 @@
+<?php
+
+namespace MW\MultiwarehouseShipping\Block\Cart\Item\Renderer;
+
+class Configurable extends \Magento\ConfigurableProduct\Block\Cart\Item\Renderer\Configurable
+{
+    public function getProductBasedOnColor($product_id, $color)
+    {
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $productRepository = $objectManager->get("Magento\Catalog\Api\ProductRepositoryInterface");
+
+        $product = $productRepository->getById($product_id);
+        $productTypeInstance = $product->getTypeInstance();
+        // $productTypeInstance->setStoreFilter($storeId, $product);
+        $usedProducts = $productTypeInstance->getUsedProducts($product);
+
+        $children_products = array();
+
+        foreach ($usedProducts as $child){
+
+            if($child->getColor() == $color) {
+
+                $children_products[] = $child->getData();
+            }
+
+        }
+        $arrangedData =  $this->arrangeDataBySize($product_id, $children_products);
+
+        return  $arrangedData;
+    }
+
+    public function arrangeDataBySize($product_id, $children_products)
+    {
+        $_objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+
+        $product = $_objectManager->get('\Magento\Catalog\Model\Product')->load($product_id);
+
+        $productTypeInstance = $_objectManager->get('Magento\ConfigurableProduct\Model\Product\Type\Configurable');
+        $productAttributeOptions = $productTypeInstance->getConfigurableAttributesAsArray($product);
+
+
+        $sizeOptions = array();
+
+        $i = 0;
+        foreach ($productAttributeOptions as $value) {
+
+            if ($value['attribute_code'] == 'size') {
+
+                foreach ($value['options'] as $item) {
+
+                    $sizeOptions[] = $item['value'];
+                }
+            }
+
+            $i++;
+        }
+
+        $order = $sizeOptions;
+
+        usort($children_products, function ($a, $b) use ($order) {
+            $pos_a = array_search($a['size'], $order);
+            $pos_b = array_search($b['size'], $order);
+            return $pos_a - $pos_b;
+        });
+
+        return $children_products;
+    }
+
+    public function getOptionLabelByValue($attributeCode, $optionId)
+    {
+        $_objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+
+        $_product = $_objectManager->create('\Magento\Catalog\Model\Product');
+        $isAttributeExist = $_product->getResource()->getAttribute($attributeCode);
+        $optionText = '';
+        if ($isAttributeExist && $isAttributeExist->usesSource()) {
+            $optionText = $isAttributeExist->getSource()->getOptionText($optionId);
+        }
+        return $optionText;
+    }
+
+    public function getItemIdBySizeAndWarehouse($item, $size, $warehouse)
+    {
+        $itemId = '';
+
+        $warehouseOptions = $item->getMultiwarehouseOptions();
+        foreach ($warehouseOptions as $option) {
+            if ($option['warehouse'] == $warehouse) {
+                $items = $option['items'];
+                foreach ($items as $key => $item) {
+                    if ($item['size'] == $size) {
+                        $itemId = $item['item_id'];
+                    }
+                }
+            }
+        }
+
+        return $itemId;
+    }
+
+    public function getQtyBySizeAndWarehouse($item, $size, $warehouse)
+    {
+        $qty = 0;
+
+        $warehouseOptions = $item->getMultiwarehouseOptions();
+        foreach ($warehouseOptions as $option) {
+            if ($option['warehouse'] == $warehouse) {
+                $items = $option['items'];
+                foreach ($items as $key => $item) {
+                    if ($item['size'] == $size) {
+                        $qty = $item['qty'];
+                    }
+                }
+            }
+        }
+
+        return $qty;
+    }
+
+    public function getSizePrice($item, $size)
+    {
+        $warehouseOptions = $item->getMultiwarehouseOptions();
+        $total = 0;
+        foreach ($warehouseOptions as $option) {
+            $items = $option['items'];
+            foreach ($items as $key => $item) {
+                if ($item['size'] == $size) {
+                    $total += $item['amount'];
+                }
+            }
+        }
+
+        return $total;
+    }
+
+    public function getRowTotalPrice($item, $color)
+    {
+        $warehouseOptions = $item->getMultiwarehouseOptions();
+        $total = 0;
+        foreach ($warehouseOptions as $option) {
+            $items = $option['items'];
+            foreach ($items as $key => $item) {
+                $total += $item['amount'];
+            }
+        }
+
+        return $total;
+    }
+
+    public function formatPrice($price)
+    {
+        if (!$price) {
+            return "";
+        }
+
+        $_objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        return $_objectManager->get("Magento\Framework\Pricing\Helper\Data")->currency($price, true, false);
+    }
+
+    public function getMultiMessages()
+    {
+        $messages = [];
+        $warehouseData = $this->getWarehouseData();
+        $itemIds = array();
+        foreach ($warehouseData as $warehouse) {
+            foreach ($warehouse['items'] as $item) {
+                $itemIds[] = $item['item_id'];
+            }
+        }
+
+        // Add basic messages occurring during this page load
+        // $baseMessages = $quoteItem->getMessage(false);
+        // if ($baseMessages) {
+        //     foreach ($baseMessages as $message) {
+        //         $messages[] = ['text' => $message, 'type' => $quoteItem->getHasError() ? 'error' : 'notice'];
+        //     }
+        // }
+
+        foreach ($itemIds as $itemId) {
+            /* @var $collection \Magento\Framework\Message\Collection */
+            $collection = $this->messageManager->getMessages(true, 'quote_item' . $itemId);
+            if ($collection) {
+                $additionalMessages = $collection->getItems();
+                foreach ($additionalMessages as $message) {
+                    /* @var $message \Magento\Framework\Message\MessageInterface */
+                    $messages[] = [
+                        'text' => $this->messageInterpretationStrategy->interpret($message),
+                        'type' => $message->getType()
+                    ];
+                }
+            }
+            $this->messageManager->getMessages(true, 'quote_item' . $itemId)->clear();
+        }
+
+        return $messages;
+    }
+
+    public function getWarehouseData()
+    {
+        return $this->getItem()->getData("multiwarehouse_options");
+    }
+}

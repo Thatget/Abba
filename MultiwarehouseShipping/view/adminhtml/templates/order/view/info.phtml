@@ -1,0 +1,84 @@
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+
+// @codingStandardsIgnoreFile
+
+?>
+<?php /** @var $block \Magento\Shipping\Block\Adminhtml\View */ ?>
+<?php $order = $block->getOrder() ?>
+<?php if ($order->getIsVirtual()) : return '';endif; ?>
+
+<?php /* Shipping Method */ ?>
+<div class="admin__page-section-item order-shipping-method">
+    <div class="admin__page-section-item-title">
+        <span class="title"><?= /* @escapeNotVerified */ __('Shipping &amp; Handling Information') ?></span>
+    </div>
+    <div class="admin__page-section-item-content">
+        <?php  if ($order->getTracksCollection()->count()) : ?>
+            <p><a href="#" id="linkId" onclick="popWin('<?= /* @escapeNotVerified */ $this->helper('Magento\Shipping\Helper\Data')->getTrackingPopupUrlBySalesModel($order) ?>','trackorder','width=800,height=600,resizable=yes,scrollbars=yes')" title="<?= /* @escapeNotVerified */ __('Track Order') ?>"><?= /* @escapeNotVerified */ __('Track Order') ?></a></p>
+        <?php endif; ?>
+        <?php if ($order->getShippingDescription()): ?>
+            <strong><?= $block->escapeHtml($order->getShippingDescription()) ?></strong>
+
+            <?php if ($this->helper('Magento\Tax\Helper\Data')->displayShippingPriceIncludingTax()): ?>
+                <?php $_excl = $block->displayShippingPriceInclTax($order); ?>
+            <?php else: ?>
+                <?php $_excl = $block->displayPriceAttribute('shipping_amount', false, ' '); ?>
+            <?php endif; ?>
+            <?php $_incl = $block->displayShippingPriceInclTax($order); ?>
+
+            <?= /* @escapeNotVerified */ $_excl ?>
+            <?php if ($this->helper('Magento\Tax\Helper\Data')->displayShippingBothPrices() && $_incl != $_excl): ?>
+                (<?= /* @escapeNotVerified */ __('Incl. Tax') ?> <?= /* @escapeNotVerified */ $_incl ?>)
+            <?php endif; ?>
+
+            <?php
+            $shippingData = false;
+            if ($order->getMultiwarehouseShipping()) {
+                $shippingData = json_decode($order->getMultiwarehouseShipping(),true);
+                if (isset($shippingData['warehouse'])) {
+                    $shippingData = $shippingData['warehouse'];
+                }
+            }
+            ?>
+            <?php if ($shippingData): ?>
+                <br>
+                <?php foreach ($shippingData as $data) : ?>
+                    <span><?= $data['warehouse_code'] ?></span> - <span><?= $data['method_title'] ?></span> - <span><?= $this->helper("Magento\Framework\Pricing\Helper\Data")->currency($data['amount'], true, false) ?></span><br>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        <?php else: ?>
+            <?= /* @escapeNotVerified */ __('No shipping information available') ?>
+        <?php endif; ?>
+    </div>
+
+    <?php
+$order_id = $this->getRequest()->getParam('order_id');
+$objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+$orderTrackingDetails = $objectManager->create('OM\Ssactivewear\Helper\TrackingDetails')->getTrackingDetailsFromSsActivewearAPI($order_id);
+
+$trackingData = isset($orderTrackingDetails['data']['shipment']) ? implode(', ',$orderTrackingDetails['data']['shipment']) : NULL;
+$ordertotal = isset($orderTrackingDetails['data']['total']) ? $orderTrackingDetails['data']['total'] : NULL;
+$orderDetails = isset($orderTrackingDetails['data']['orders']) ? $orderTrackingDetails['data']['orders'] : NULL;
+
+?>
+<div style="font-size:12px;">
+    <div id="technosport_order_number">
+        <h4>Order Details:</h4>
+        <?php echo $orderDetails; ?>
+    </div>
+
+    <div style="clear:both;"></div>
+    <p>&nbsp;</p>
+    <div id="shipping_tracking_number">
+         <h4>Tracking Number:</h4>
+        <?php echo  $trackingData ?>
+    </div>
+</div>
+
+
+
+</div>

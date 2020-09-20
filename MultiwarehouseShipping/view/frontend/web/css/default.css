@@ -1,0 +1,30 @@
+.opc-block-summary .mark span.value{
+	white-space: pre-line;
+}
+
+.opc-block-shipping-information .shipping-information-content span.value{
+	white-space: pre-line;
+}
+#checkout {
+	font-size: 16px;
+}
+
+.action.primary.checkout{
+	background-color: #1074bc !important;
+}
+
+#checkout .form-shipping-address .label span{
+	font-weight: bold;
+}
+
+#checkout #checkout-shipping-method-load span.price{
+	font-weight: bold;
+}
+
+#checkout .step-title{
+	font-weight: bold;
+}
+
+#checkout .opc-block-summary .product-item .product.options span.toggle span{
+	font-weight: bold;
+}

@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<!--
+  ~  Mage-World
+  ~
+  ~ @category    Mage-World
+  ~ @package     MW
+  ~ @author      Dreyar Developer (dreyar@mage-world.com)
+  ~
+  ~ @copyright   Copyright (c) 2018 Mage-World (https://www.mage-world.com/)
+  -->
+
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Config:etc/system_file.xsd">
+    <system>
+        <section id="carriers">
+            <group id="purolator">
+                <!-- <field id="delay_day" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="85">
+                    <label>Days to add to estimate delivery days (Default)</label>
+                    <validate>validate-number</validate>
+                </field> -->
+                <group id="purolator_services">
+                    <group id="purolator_service_purolatorexpress">
+                        <field id="purolatorexpress_delay_day" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="30">
+                            <label>Days to add to estimate delivery days</label>
+                            <validate>validate-number</validate>
+                            <config_path>carriers/purolator/purolatorexpress_delay_day</config_path>
+                        </field>
+                    </group>
+                    <group id="purolator_service_purolatorground">
+                        <field id="purolatorground_delay_day" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="30">
+                            <label>Days to add to estimate delivery days</label>
+                            <validate>validate-number</validate>
+                            <config_path>carriers/purolator/purolatorground_delay_day</config_path>
+                        </field>
+                    </group>
+                    <group id="purolator_service_purolatorexpressus">
+                        <field id="purolatorexpressus_delay_day" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="30">
+                            <label>Days to add to estimate delivery days</label>
+                            <validate>validate-number</validate>
+                            <config_path>carriers/purolator/purolatorexpressus_delay_day</config_path>
+                        </field>
+                    </group>
+                    <group id="purolator_service_purolatorgroundus">
+                        <field id="purolatorgroundus_delay_day" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="30">
+                            <label>Days to add to estimate delivery days</label>
+                            <validate>validate-number</validate>
+                            <config_path>carriers/purolator/purolatorgroundus_delay_day</config_path>
+                        </field>
+                    </group>
+                    <group id="purolator_service_purolatorexpressinternational">
+                        <field id="purolatorexpressinternational_delay_day" translate="label" type="text" showInDefault="1" showInWebsite="1" showInStore="1" sortOrder="30">
+                            <label>Days to add to estimate delivery days</label>
+                            <validate>validate-number</validate>
+                            <config_path>carriers/purolator/purolatorexpressinternational_delay_day</config_path>
+                        </field>
+                    </group>
+                </group>
+            </group>
+        </section>
+    </system>
+</config>

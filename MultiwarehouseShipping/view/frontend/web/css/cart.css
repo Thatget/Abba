@@ -1,0 +1,22 @@
+@media screen and (min-width: 768px) {
+	.cart-summary{
+		width: 30% !important;
+	}
+	.abs-shopping-cart-items-desktop, .block-cart-failed, .cart-container .form-cart, .cart-container .cart-gift-item{
+		width: 66% !important;
+	}
+}
+.cart-summary #cart-totals .totals th span.value{
+	white-space: pre-line;
+    position: relative;
+    left: 10px;
+    font-size: 14px;
+}
+
+.cart-container{
+	font-size: 16px;
+}
+
+.cart-container #co-shipping-method-form{
+	font-size: 15px;
+}

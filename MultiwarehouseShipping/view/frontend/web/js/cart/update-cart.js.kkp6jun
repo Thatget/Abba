@@ -1,0 +1,430 @@
+define([
+    'jquery',
+    'Magento_Catalog/js/price-utils',
+    'Magento_Checkout/js/model/quote',
+    'Magento_Checkout/js/model/cart/totals-processor/default',
+    'Magento_Checkout/js/model/cart/cache',
+    'mage/url',
+    'Magento_Ui/js/modal/modal',
+    'jquery/ui',
+    'mage/translate',
+], function($, priceUtils, quote, totalsDefaultProvider, cartCache, urlProvider, modal) {
+    "use strict";
+
+    $(document).on('touchstart', '.cart-wh-size-qty dl dt', function () {
+        $(this).toggleClass('active');
+        if($(this).hasClass('active')){
+            $(".cart-wh-size-qty dl dd").slideUp();
+            $(".cart-wh-size-qty dl dt").removeClass('active');
+            $(this).addClass('active');
+            $(this).next('dd').slideDown();
+        }
+        else{
+            $(this).next('dd').slideUp();
+        }
+    });
+
+    $.widget('mage.updateCartMultiwarehouse', {
+
+        options: {
+            cartContainerSelector: '.cart-container',
+            cartFormSelector: '#form-validate',
+            shippingFormSelector: '#shipping-zip-form',
+            cartTableSelector: '#shopping-cart-table',
+            updateItemSelector: 'cart-update',
+            addItemSelector: 'cart-add',
+            messageSelector: '.messages',
+            cartItemIdData: 'data-cart-item-id',
+            itemParentIdData: 'data-parent-id',
+            itemSizeData: 'data-size',
+            itemWarehouseData: 'data-warehouse',
+            itemPriceData: 'data-price',
+            sizeInputsSelectorData: 'data-size',
+            oldInputVal: 0,
+            productIdData: 'data-product-id',
+            itemColorData: 'data-color'
+        },
+
+        _create: function() {
+            this._EventListener();
+        },
+
+        _EventListener: function () {
+            var self = this;
+            //refresh cart totals
+            // self._refreshCartTotals();
+            $(self.options.cartFormSelector).on('focus', 'input[type="number"]', function(){
+                self.options.oldInputVal = $(this).val();
+            });
+
+            $(self.options.cartFormSelector).on('change', 'input[type="number"]', function () {
+                if (self._validateInput(this)) {
+                    self._ajaxUpdateCartItems(this);
+                } else {
+                    $(this).attr('value', self.options.oldInputVal);
+                    alert($.mage.__('Please enter valid number.'));
+                }
+            });
+
+            // $(document).ready(function() {
+            //     self._checkBackorderMessages(whCodesSkusJson);
+            //
+            //     $('button[data-role="proceed-to-checkout"]').click(function (event) {
+            //         self._backorderPopup();
+            //     });
+            // });
+        },
+
+        _getDataToPost: function (input) {
+            var self = this,
+                formKey = $(self.options.cartFormSelector + ' input[name="form_key"]').val(),
+                data = {};
+
+            if ($(input).attr('name') == self.options.updateItemSelector) {
+                data = {
+                    'cart': {},
+                    'form_key': formKey
+                };
+
+                if($(input).val() > $(input).data('max')){
+                    data['cart'][$(input).attr(self.options.cartItemIdData)] = {'qty': $(input).data('max')};
+                }else{
+                    data['cart'][$(input).attr(self.options.cartItemIdData)] = {'qty': $(input).val()};
+                }
+
+            } else if ($(input).attr('name') == self.options.addItemSelector) {
+                var productId = $(input).attr(self.options.productIdData),
+                    size= $(input).attr(self.options.itemSizeData),
+                    warehouse = $(input).attr(self.options.itemWarehouseData),
+                    color = $(input).attr(self.options.itemColorData);
+
+                data = {
+                    'cartAdd': {
+                        productId: productId,
+                        size: size,
+                        warehouse: warehouse,
+                        color: color,
+                        qty: $(input).val()
+                    },
+                    'form_key': formKey
+                };
+            }
+
+            return data;
+        },
+
+        _ajaxUpdateCartItems: function(input) {
+
+
+            var self = this,
+                data = self._getDataToPost(input);
+
+            $.ajax({
+                url: urlProvider.build("mwmultiwarehouse/cart/update"),
+                data: data,
+                type: 'post',
+                dataType: 'json',
+                timeout: 120000,
+
+                beforeSend: function () {
+                    //disable all input boxes when adding/updating item
+                    $('input').prop('disabled', true);
+                    //show loader
+                    $('body').trigger('processStart');
+                },
+
+                success: function(res) {
+                    if (res.updated == true) {
+                        var regionSelector = $(self.options.shippingFormSelector).find('select[name="region_id"]'),
+                            regionSelectorVal = regionSelector.val(),
+                            cartTable = $(self.options.cartTableSelector),
+                            rowTotalElement = null,
+                            sizeInputsSelector = null,
+                            sizeTotalSelector = null,
+                            rowTotalSelector = null,
+                            sizeInputs = null,
+                            sizeTotal = 0,
+                            sizeOldTotal = 0,
+                            rowTotal = 0,
+                            price = 0,
+                            qty = 0;
+
+                        //set updated qty to element attribute
+                        $(input).attr('value', $(input).val());
+
+                        //update size total, so get all the quantity box for the size
+                        sizeInputsSelector = $(input).attr(self.options.sizeInputsSelectorData),
+                            sizeInputs = cartTable.find('input[' + self.options.sizeInputsSelectorData
+                                + '="' + sizeInputsSelector +'"]');
+
+                        //add the price of each quantity box for the size to calculate size total
+                        sizeInputs.each(function(index) {
+                            price = parseFloat($(this).attr(self.options.itemPriceData));
+                            qty = $(this).val();
+
+                            sizeTotal = sizeTotal + (price * qty);
+                        });
+
+                        //update size total
+                        sizeTotalSelector = cartTable.find('#total-' + sizeInputsSelector);
+                        sizeOldTotal = parseFloat(sizeTotalSelector.attr(self.options.itemPriceData));
+                        sizeTotalSelector.attr(self.options.itemPriceData, sizeTotal);
+                        sizeTotalSelector.html('<span class="price">' +
+                            (sizeTotal?priceUtils.formatPrice(sizeTotal, quote.getPriceFormat()):'') + '</span>');
+
+                        //update row total
+                        rowTotalElement = cartTable.find('#total-' + $(input).attr('data-product-id') + '-' + $(input).attr('data-color'));
+                        rowTotal = parseFloat(rowTotalElement.attr(self.options.itemPriceData));
+                        rowTotal = rowTotal + (sizeTotal - sizeOldTotal);
+                        rowTotalElement.attr(self.options.itemPriceData, rowTotal);
+                        rowTotalElement.html('<span class="price">' +
+                            priceUtils.formatPrice(rowTotal, quote.getPriceFormat()) + '</span>');
+
+                        /**
+                         * check if there is need to remove a warehouse,
+                         * cart row item or need to show empty cart
+                         */
+                        if ($(input).val() == 0) {
+                            var whId = $(input).attr(self.options.itemWarehouseData),
+                                whInputs = $(input).closest('ul').find('input[type="number"]'),
+                                loopBreaked = false;
+
+                            $.each(whInputs, function(index) {
+                                if ($(this).attr('value') != 0) {
+                                    loopBreaked = true;
+                                    //break loop
+                                    return false
+                                }
+                            });
+
+
+                            if (loopBreaked == false) {
+                                /**
+                                 * if qty for atleast one size for a warehouse
+                                 * is non-zero then display the warehouse
+                                 * otherwise remove the warehouse
+                                 */
+                                $(input).closest('dl').remove();
+
+                                var sizeInputSelector = $(input).attr(self.options.sizeInputsSelectorData),
+                                    dlSelector = sizeInputSelector.substring(0, sizeInputSelector.lastIndexOf("-"));
+
+                                if ($('.dl-' + dlSelector).length == 0) {
+                                    var trSelector = dlSelector;
+
+                                    //if all warehouses are removed then remove color item
+                                    $('#tr-' + trSelector).remove();
+
+                                    if ($(self.options.cartTableSelector).find('tr.item-info').length == 0) {
+                                        //if there are no items then show empty cart
+                                        $(self.options.cartContainerSelector).remove();
+
+                                        var homeUrl = '<a href="' + urlProvider.build('') + '">' +
+                                            $.mage.__('here') + '</a>',
+                                            emptyCartHtml = '<div class="cart-empty">' +
+                                                '<p>' + $.mage.__('You have no items in your shopping cart.') + '</p>' +
+                                                '<p>' +
+                                                $.mage.__('Click %1 to continue shopping.').replace('%1', homeUrl) +
+                                                '</p>' +
+                                                '<div>';
+
+                                        $('div.main').append(emptyCartHtml);
+                                    }
+                                }
+                            } else {
+                                //as qty is set zero, so this can be added to cart
+                                $(input).attr('name', self.options.addItemSelector);
+                            }
+                        }
+
+                        if (res.added_item_id) {
+                            $(input).attr(self.options.cartItemIdData, res.added_item_id);
+                            $(input).attr('name', self.options.updateItemSelector);
+                        }
+
+                        //refresh cart totals
+                        self._refreshCartTotals();
+                    }
+
+                    if (res.updated == false) {
+                        $(input).attr('value', self.options.oldInputVal);
+                        alert(res.message);
+                    }
+
+                    // self._showRemoveBackorderMsg(input);
+
+                    //enable all input boxes after adding/updating item
+                    $('input').prop('disabled', false);
+                    //hide loader
+                    $('body').trigger('processStop');
+                },
+                always: function (res) {
+                    $('body').trigger('processStop');
+                    $('input[data-max="0"]').prop('disabled', true);
+                }
+            });
+        },
+
+        _showRemoveBackorderMsg: function (input) {
+            var self = this;
+
+            if ($(input).val() == 0) {
+                $(input).removeClass('bo-notify');
+                $(input).next('div.back-order').remove();
+                $(input).attr('title', $.mage.__('Qty'));
+
+                var currentTrId = $(input).parents('tr.item-info').attr('id');
+
+                if ($('#' + currentTrId).find('.bo-notify').length == 0) {
+                    $('#' + currentTrId).find('.cart-notify').hide();
+                }
+            } else {
+                var whSkus = {},
+                    whSkuParts = $(input).attr('wh-sku').split('-'),
+                    wh = whSkuParts[0],
+                    sku = whSkuParts[1] + '-' + whSkuParts[2] + '-' + whSkuParts[3];
+
+                whSkus[wh] = [sku];
+
+                self._checkBackorderMessages(whSkus);
+            }
+        },
+
+        _checkBackorderMessages: function (whSkus) {
+            var self = this;
+
+            $.ajax({
+                url: self.options.inventoryUrl,
+                /**
+                 * var whCodesSkusJson is declared and initialised in
+                 * \app\code\Perficient\Checkout\view\frontend\templates\cart\form.phtml
+                 */
+                data: {'wh_codes_skus': whSkus},
+                type: 'post',
+                dataType: 'json',
+                timeout: 120000,
+
+                beforeSend: function () {
+                    //disable all input boxes when adding/updating item
+                    $('input').prop('disabled', true);
+                    //show loader
+                    $('body').trigger('processStart');
+                },
+
+                success: function(res) {
+                    if (res.success) {
+                        var backOrderQty, storeBackOrderQty, qtyEntered, inputElement, whStyleColorSize = [], ulElement,
+                            liElement, trArray,
+                            backorderMsg = $.mage.__('Items on backorder are highlighted in red below');
+
+                        $.each(res.wh_sku_inv, function (whSku, inv) {
+                            inputElement = $(self.options.cartTableSelector).find('input[wh-sku="' + whSku + '"]');
+                            qtyEntered = parseInt(inputElement.val());
+                            backOrderQty = qtyEntered - inv;
+
+                            if (qtyEntered > inv) {
+                                $(inputElement).addClass('bo-notify');
+                                $('.cart-notify').show();
+
+                                if ($(inputElement).siblings('div.back-order').length == 0) {
+                                    $(inputElement).after(
+                                        '<div class="back-order">' +
+                                        '<span>' + backOrderQty + '</span>' +
+                                        '/' + qtyEntered +
+                                        '</div>');
+                                } else {
+                                    $(inputElement).siblings('div.back-order').html(
+                                        '<span>' + backOrderQty + '</span>' + '/' + qtyEntered
+                                    );
+                                }
+
+                                $(inputElement).attr(
+                                    'title',
+                                    $.mage.__('%1 unit(s) out of %2 will be backordered')
+                                        .replace('%1', backOrderQty)
+                                        .replace('%2', qtyEntered)
+                                );
+                            } else {
+                                if ($(inputElement).hasClass('bo-notify')) {
+                                    $(inputElement).removeClass('bo-notify');
+                                    $(inputElement).next('div.back-order').remove();
+                                    $(inputElement).attr('title', $.mage.__('Qty'));
+                                }
+                            }
+                        });
+
+                        trArray = $(self.options.cartTableSelector).find('tr');
+
+                        var itemNotifier;
+                        trArray.each(function () {
+                            itemNotifier = $('#' + this.id).find('.cart-notify');
+
+                            if ($('#' + this.id).find('.bo-notify').length > 0) {
+                                itemNotifier.text(backorderMsg);
+                                itemNotifier.show();
+                            } else {
+                                itemNotifier.hide();
+                            }
+                        });
+                    } else {
+                        console.log(res.console_err)
+                    }
+
+                    //enable all input boxes after adding/updating item
+                    $('input').prop('disabled', false);
+                    //hide loader
+                    $('body').trigger('processStop');
+                },
+
+                error: function (jqXHR, textStatus, errorThrown) {
+                    //enable all input boxes after adding/updating item
+                    $('input').prop('disabled', false);
+                    //hide loader
+                    $('body').trigger('processStop');
+
+                    console.log(textStatus + ':' + errorThrown);
+                }
+            });
+        },
+
+        _validateInput: function (input) {
+            if (/^(\d)+$/.test($(input).val())) {
+                return true;
+            }
+
+            return false;
+        },
+
+        _refreshCartTotals: function () {
+            cartCache.set('totals',null);
+            totalsDefaultProvider.estimateTotals(quote.shippingAddress());
+        },
+
+        _backorderPopup: function () {
+            var self = this,
+                boNotifier = $(self.options.cartTableSelector).find('.bo-notify');
+
+            if (boNotifier.length > 0) {
+                var popupOptions = {
+                    type: 'popup',
+                    buttons: [
+                        {
+                            text: $.mage.__('Edit'),
+                            class: 'action edit-order',
+                            click: function () {
+                                this.closeModal();
+                            }
+                        },
+                    ]
+                };
+
+                var popup = modal(popupOptions, $('#popup-backorder'));
+                $("#popup-backorder").modal('openModal');
+            } else {
+                // location.href = self.options.checkoutUrl;
+            }
+        }
+    });
+
+    return $.mage.updateCartMultiwarehouse;
+});

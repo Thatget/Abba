@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+
+<!--
+  ~  Mage-World
+  ~
+  ~ @category    Mage-World
+  ~ @package     MW
+  ~ @author      Dreyar Developer (dreyar@mage-world.com)
+  ~
+  ~ @copyright   Copyright (c) 2018 Mage-World (https://www.mage-world.com/)
+  -->
+
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <type name="Magento\Shipping\Model\Shipping">
+        <plugin name="multiwarehouseReCollectRates" type="MW\MultiwarehouseShipping\Plugin\Shipping\Model\Shipping" />
+    </type>
+    <type name="Magento\Checkout\Model\ShippingInformationManagement">
+        <plugin name="multiwarehousePluginShippingInformationManagement" type="MW\MultiwarehouseShipping\Plugin\Checkout\Model\ShippingInformationManagement" />
+    </type>
+    <type name="Magento\Quote\Model\Quote\Address">
+        <plugin name="multiwarehousePluginQuoteAddress" type="MW\MultiwarehouseShipping\Plugin\Quote\Model\Quote\Address" />
+    </type>
+    <type name="Magento\Quote\Model\Quote\Address\Total\Shipping">
+        <plugin name="multiwarehousePluginTotalShipping" type="MW\MultiwarehouseShipping\Plugin\Quote\Address\Total\Shipping" />
+    </type>
+
+    <type name="Magento\Checkout\Model\TotalsInformationManagement">
+        <plugin name="multiwarehousePluginTotalsInformationManagement" type="MW\MultiwarehouseShipping\Plugin\Checkout\Model\TotalsInformationManagement" />
+    </type>
+
+    <preference for="Purolator\Shipping\Model\Purolator\EstimateService" type="MW\MultiwarehouseShipping\Rewrite\Purolator\Model\Purolator\EstimateService"/>
+
+    <preference for="Meetanshi\Canadapost\Model\Carrier\Shipping" type="MW\MultiwarehouseShipping\Rewrite\Canadapost\Model\Carrier\Shipping"/>
+
+    <preference for="Magento\ConfigurableProduct\Block\Cart\Item\Renderer\Configurable" type="MW\MultiwarehouseShipping\Block\Cart\Item\Renderer\Configurable"/>
+    <preference for="Magento\Checkout\Block\Cart\Grid" type="MW\MultiwarehouseShipping\Block\Cart\Grid"/>
+    <preference for="Magento\ConfigurableProduct\Model\Product\Type\Configurable" type="MW\MultiwarehouseShipping\Model\Product\Type\Configurable"/>
+
+    <!--add delay day to purolator start-->
+    <preference for="Purolator\Shipping\Model\Carrier\Purolator" type="MW\MultiwarehouseShipping\Rewrite\Purolator\Model\Carrier\Purolator"/>
+    <!--add delay day to purolator end-->
+</config>

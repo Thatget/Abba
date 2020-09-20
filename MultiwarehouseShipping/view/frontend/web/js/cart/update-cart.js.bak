@@ -1,0 +1,39 @@
+require(
+    [
+        'jquery',
+        'mage/url'
+    ], function ($, Url) {
+    $(document).ready(function () {
+        $(".multiwarehouse-item-qty").change(function (e) {
+            var qty, warehouse, color, size, product_id;
+            qty = e.currentTarget.value;
+            warehouse = $(e.currentTarget).attr('data-warehouse');
+            color = $(e.currentTarget).attr('data-color');
+            size = $(e.currentTarget).attr('data-size');
+            product_id = $(e.currentTarget).attr('data-product-id');
+
+            if (qty < 0) {
+                alert("Quantity Invalid!");
+                return false;
+            }
+
+            var param = {
+                qty: qty,
+                warehouse: warehouse,
+                color: color,
+                size: size,
+                product_id: product_id
+            }
+
+            var url = Url.build("mwmultiwarehouse/cart/update");
+            $('body').trigger('processStart');
+
+            $.post(url, param, function (res) {
+                console.log(res);
+            })
+            .always(function(){
+                $('body').trigger('processStop');
+            });
+        });
+    });
+});

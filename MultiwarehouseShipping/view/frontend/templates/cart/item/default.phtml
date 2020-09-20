@@ -1,0 +1,515 @@
+<?php
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+// @codingStandardsIgnoreFile
+
+/** @var $block \Magento\Checkout\Block\Cart\Item\Renderer */
+/*@saurabh*/
+$outStockQtyhelper = $this->helper('Bay20\WarehouseConfigurable\Helper\Data');
+$outStockThreshold = $outStockQtyhelper->getStockQty() ?? 1;
+/*@saurabh*/
+
+$_item = $block->getItem();
+
+$product = $_item->getProduct();
+$isVisibleProduct = $product->isVisibleInSiteVisibility();
+/** @var \Magento\Msrp\Helper\Data $helper */
+$helper = $this->helper('Magento\Msrp\Helper\Data');
+
+
+$canApplyMsrp = $helper->isShowBeforeOrderConfirm($product) && $helper->isMinimalPriceLessMsrp($product);
+
+
+$wharehouseBlock = $block->getLayout()->createBlock('Bay20\WarehouseConfigurable\Block\Warehouse');
+$warehouses = [];
+foreach ($wharehouseBlock->getWarehouse() as $_wh){
+    $warehouses[$_wh['title']] = $_wh['warehouse_id'];
+}
+
+?>
+
+<?php if ($_item->getData("multiwarehouse_options")):  ?>
+    <tbody class="cart item">
+    <tr class="item-info">
+        <td data-th="<?= $block->escapeHtml(__('Item')) ?>" class="col item">
+            <?php if ($block->hasProductUrl()):?>
+            <a href="<?= /* @escapeNotVerified */ $block->getProductUrl() ?>"
+               title="<?= $block->escapeHtml($block->getProductName()) ?>"
+               tabindex="-1"
+               class="product-item-photo">
+                <?php else:?>
+                <span class="product-item-photo">
+            <?php endif;?>
+            <?= $block->getImage($block->getProductForThumbnail(), 'cart_page_product_thumbnail')->toHtml() ?>
+            <?php if ($block->hasProductUrl()):?>
+            </a>
+        <?php else: ?>
+            </span>
+        <?php endif; ?>
+            <div class="product-item-details">
+                <strong class="product-item-name">
+                    <?php if ($block->hasProductUrl()):?>
+                        <a href="<?= /* @escapeNotVerified */ $block->getProductUrl() ?>"><?= $block->escapeHtml($block->getProductName()) ?></a>
+                    <?php else: ?>
+                        <?= $block->escapeHtml($block->getProductName()) ?>
+                    <?php endif; ?>
+                </strong>
+                <br>
+                <?php echo __("Color") ?>: <strong><?php echo $_item->getData('color') ?></strong>
+                <br>
+
+                <div class="action-links">
+                    <a href="<?php echo $block->getUrl("mwmultiwarehouse/cart/delete", array("product_id" => $_item->getProductId(), 'color'=>$_item->getData("color_id")))?>" data-title="Remove All" class="action action-delete">
+                        <span><?php echo __("Remove All")?></span>
+                    </a>
+                    <style type="text/css">
+                        a[data-title="Remove All"]:hover:after{
+                            content: attr(data-title);
+                            color: red;
+                            position: absolute;
+                            left: 50%;
+                            top: 100%;
+                        }
+                    </style>
+                </div>
+
+<!--                --><?php //if ($messages = $block->getMultiMessages()): ?>
+<!--                    --><?php //foreach ($messages as $message): ?>
+<!--                        <div class="cart item message --><?//= /* @escapeNotVerified */ $message['type'] ?><!--">-->
+<!--                            <div>--><?//= $block->escapeHtml($message['text']) ?><!--</div>-->
+<!--                        </div>-->
+<!--                    --><?php //endforeach; ?>
+<!--                --><?php //endif; ?>
+
+                <?php
+                $error = false;
+                $errorContent = "";
+                 foreach ($_item->getData("multiwarehouse_options") as $option):
+                foreach ($block->getProductBasedOnColor($_item->getProductId(), $_item->getData('color_id')) as $pd) :
+                 ?>
+                    <?php
+                    $warehouse_item_data = $wharehouseBlock->getWareHouseQuantity($warehouses[$option['warehouse']], $pd['entity_id']);
+                    $warehouse_quantity  = @round($warehouse_item_data[0]['available_qty'],2) - $outStockThreshold;
+                    if ((!($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0){
+                        $error = true;
+                        $errorContent = "This product is out of stock";
+                        break;
+                    }elseif((($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0) {
+                        $error = true;
+                        $errorContent = "This product is out of stock";
+                        break;
+                    }
+                    ?>
+                <?php endforeach; ?>
+                <?php endforeach; ?>
+                <?php
+                    if ($error){
+                        ?>
+                        <div class="cart item message error" >
+                            <div>
+                                <?php
+                                echo $errorContent;
+                                ?>
+                            </div>
+                        </div>
+                        <?php
+                    }
+                 ?>
+                <?php $addInfoBlock = $block->getProductAdditionalInformationBlock(); ?>
+                <?php if ($addInfoBlock): ?>
+                    <?= $addInfoBlock->setItem($_item)->toHtml() ?>
+                <?php endif;?>
+            </div>
+            <div class="cart-wh-size-qty">
+                <ul class="sizes">
+                    <?php $productData = $block->getProductBasedOnColor($_item->getProductId(), $_item->getData('color_id'));
+                    foreach ($productData as $pd) {
+                        $size_label = $block->getOptionLabelByValue('size', $pd['size']);
+                        ?>
+                        <li>
+                            <span class="size"><?php echo $size_label ?></span>
+                            <span class="price"><?php echo $block->formatPrice($pd['price']);?></span>
+                        </li>
+                        <?php
+                    }
+                    ?>
+                </ul>
+                <?php foreach ($_item->getData("multiwarehouse_options") as $option): ?>
+                    <dl class="dl-<?php echo $_item->getData('color_id') ?>">
+                        <dt><?php echo $option['warehouse'] ?><span class="wh-name-opt"></span></dt>
+                        <dd class="">
+                            <ul>
+                                <?php foreach ($block->getProductBasedOnColor($_item->getProductId(), $_item->getData('color_id')) as $pd) :
+                                ?>
+                                    <?php $warehouse_item_data = $wharehouseBlock->getWareHouseQuantity($warehouses[$option['warehouse']], $pd['entity_id']);
+
+                                        $warehouse_quantity  = @round($warehouse_item_data[0]['available_qty'],2) - $outStockThreshold;
+
+                                    ?>
+                                    <li>
+                                        <?php $size_label = $block->getOptionLabelByValue('size', $pd['size']); ?>
+                                        <span class="size"><?php echo $size_label ?></span>
+                                        <span class="price"><?php echo $block->formatPrice($pd['price']);?></span>
+                                        <input min="0" class="input-text qty multiwarehouse-item-qty"
+                                               data-cart-item-id="<?php echo $block->getItemIdBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) ?>"
+                                               data-price="<?php echo $pd['price'] ?>"
+                                               data-color="<?php echo $_item->getData('color_id') ?>"
+                                               data-product-id="<?php echo $_item->getProductId() ?>"
+                                               data-size="<?php echo $pd['size'] ?>"
+                                               data-warehouse="<?php echo $option['warehouse'] ?>"
+                                               type="number"
+                                               name="<?php echo $block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse'])?"cart-update":"cart-add" ?>"
+                                               value="<?php echo $block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) ?>"
+                                               data-max="<?php echo ($warehouse_quantity>=0)?$warehouse_quantity:0; ?>" <?php echo ($warehouse_quantity <= 0) ? 'disabled' : ''; ?>/>
+                                        <?php
+                                        if ((!($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0){
+                                           ?>
+                                            <a href="<?php echo $block->getUrl("mwmultiwarehouse/cart/delete", array("product_id" => $_item->getProductId(), 'color'=>$_item->getData("color_id"),'size'=>$pd['size'],'warehouse'=>$option['warehouse']))?>"
+                                               data-title="Remove" class="action action-delete">
+                                                <h5 class="qty-available"><?php echo __("Out Stock")?></h5>
+                                                <span class="qty-available">
+<!--                                                    <img src="--><?php //echo $this->getViewFileUrl('MW_MultiwarehouseShipping::images/remove.jpg'); ?><!--" />-->
+                                                    <h6 style="color: red;font-weight: bold;">Remove</h6>
+                                                </span>
+                                            </a>
+                                            <?php
+                                        }elseif((($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0) {
+                                            ?>
+                                            <a href="<?php echo $block->getUrl("mwmultiwarehouse/cart/delete", array("product_id" => $_item->getProductId(), 'color'=>$_item->getData("color_id"),'size'=>$pd['size'],'warehouse'=>$option['warehouse']))?>"
+                                               data-title="Remove" class="action action-delete">
+                                                <h5 class="qty-available"><?= $warehouse_quantity ?></h5>
+                                                <span class="qty-available">
+<!--                                                    <img src="--><?php //echo $this->getViewFileUrl('MW_MultiwarehouseShipping::images/remove.jpg'); ?><!--" />-->
+                                                    <h6 style="color: red;font-weight: bold;">Remove</h6>
+                                                </span>
+                                            </a>
+                                            <?php
+                                        }else{
+                                            ?>
+                                        <span class="qty-available"><?= ($warehouse_quantity > 0) ? $warehouse_quantity: 'Out Stock' ; ?></span>
+                                    </li>
+                                <?php } endforeach; ?>
+                            </ul>
+                        </dd>
+                    </dl>
+                <?php endforeach; ?>
+                <ul class="cart-size-price">
+                    <?php foreach ($block->getProductBasedOnColor($_item->getProductId(), $_item->getData('color_id')) as $pd) : ?>
+                        <li id="total-<?php echo $pd['size'] ?>" data-price="<?php echo $block->getSizePrice($_item, $pd['size']) ?>">
+                            <span class="price" id="row-price-<?php echo $pd['size'] ?>" data-price="<?php echo $block->getSizePrice($_item, $pd['size']) ?>"><?php echo $block->formatPrice($block->getSizePrice($_item, $pd['size'])) ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+
+            <div id="total-<?php echo $_item->getProductId() ?>-<?php echo $_item->getData("color_id")?>" class="row-total" data-price="<?php echo $block->getRowTotalPrice($_item, $_item->getData("color")) ?>">
+                <span class="price"><?php echo $block->formatPrice($block->getRowTotalPrice($_item, $_item->getData("color"))) ?></span>
+            </div>
+        </td>
+    </tr>
+    </tbody>
+    <style type="text/css">
+        .cart-container .form-cart .qty-available {font-size: 12px;}
+        .cart-container .form-cart .action.update, .cart-container .form-cart .action.update{
+            display: none;
+        }
+
+        .cart.table-wrapper .data.table .item-info .product-item-details{
+            float: right;
+            width: 80%;
+            box-sizing: border-box;
+            display: block;
+            padding: 0;
+            color: #568dc4;
+            position: relative;
+        }
+        .cart.table-wrapper .data.table .item-info .product-item-photo{
+            display: block;
+            float: left;
+            width: 20%;
+            padding: 0;
+        }
+        .cart.table-wrapper .data.table .item-info .product-item-details .action-links{
+            position: relative;
+            float: right;
+            margin-bottom: 10px;
+            margin-right: 20px;
+            color: #568dc4;
+        }
+        .cart.table-wrapper .data.table .item-info .product-item-details .action-links a{
+            color: #568dc4;
+             position: relative;
+            z-index: 10;
+        }
+
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty{
+            float: right;
+            width: 80%;
+            margin-top: 15px;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty ul{
+            display: inline-block;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            min-height: 40px;
+            line-height: 18px;
+            clear: both;
+            font-size: 20px;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty ul li{
+            float: left;
+            width: 51px;
+            text-align: center;
+            margin: 0 15px 0 0;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd ul li .size, .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd ul li .price{
+            display: none;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty ul.sizes .price{
+            font-size: 14px;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl{
+            padding: 0;
+            margin: 0;
+            clear: both;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dt{
+            font-weight: 700;
+            color: #666;
+            margin: 10px 0 5px;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty ul li .qty{
+            text-align: center;
+            padding: 0;
+            border-radius: 0;
+            background: #fff;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty .cart-size-price{
+            font-style: italic;
+            font-size: 14px;
+            margin-top: 3px;
+            padding-top: 14px;
+            padding-left: 1px;
+            background-color: #f5f5f5;
+            min-height: 30px;
+        }
+        .cart.table-wrapper .data.table .item-info .row-total{
+            clear: both;
+            text-align: right;
+            font-weight: 700;
+            font-size: 16px;
+            padding: 13px 0 3px;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dt .wh-name-opt{
+            display: none;
+        }
+        .cart.table-wrapper .data.table .item-info .cart-wh-size-qty .cart-size-price li{
+            height: 20px;
+            font-size: 13px;
+        }
+
+        @media screen and (min-width: 768px){
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd ul li .size, .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd ul li .price{
+                display: none;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty .cart-size-price, .cart.table-wrapper .data.table .item-info .cart-wh-size-qty .sizes{
+                display: block;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd{
+                display: block !important;
+            }
+        }
+
+        @media screen and (max-width: 767px){
+            .cart.table-wrapper .data.table .item-info .col.item{
+                padding: 20px 0;
+            }
+            .cart.table-wrapper .data.table .item-info .col.item .product-item-details{
+                text-align: left;
+                width: 65%;
+                float: left;
+                margin-left: 20px;
+            }
+            .cart.table-wrapper .data.table .item-info .col.item .product-item-photo{
+                width: 40%;
+                max-width: 80px;
+                left: 0;
+                position: static;
+            }
+
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty{
+                float: none;
+                width: 100%;
+                clear: both;
+                background: #eee;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd ul li .size, .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd ul li .price{
+                display: block;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty .cart-size-price, .cart.table-wrapper .data.table .item-info .cart-wh-size-qty .sizes{
+                display: none;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dt .wh-name-opt{
+                display: block;
+                float: right;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dt.active .wh-name-opt:before{
+                content: "\f068";
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dt .wh-name-opt:before{
+                width: 20px;
+                height: 20px;
+                border-radius: 2px;
+                text-align: center;
+                line-height: 20px;
+                color: #2c4474;
+                background: #fff;
+                display: block;
+                content: '\f067';
+                font-family: 'FontAwesome';
+                margin-top: 14px;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dt{
+                text-align: left;
+                height: 49px;
+                line-height: 49px;
+                margin: 0 auto;
+                float: none;
+                max-width: 100%;
+                padding: 0 15px;
+                font-weight: 500;
+                border-bottom: 1px solid #fff;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd{
+                display: none;
+                background: #fff;
+                padding: 15px;
+                margin: 0;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty dl dd ul li{
+                margin-bottom: 15px;
+            }
+            .cart.table-wrapper .data.table .item-info .cart-wh-size-qty ul{
+                font-size: 13px;
+                display: inline-flex;
+            }
+        }
+    </style>
+    <script type="text/x-magento-init">
+    {
+        "#shopping-cart-table": {
+            "updateCartMultiwarehouse": {
+                "cartFormSelector": "#form-validate",
+                "cartTableSelector": "#shopping-cart-table"
+            }
+        }
+    }
+</script>
+<?php else:  ?>
+    <tbody class="cart item">
+    <tr class="item-info">
+        <td data-th="<?= $block->escapeHtml(__('Item')) ?>" class="col item">
+            <?php if ($block->hasProductUrl()):?>
+            <a href="<?= /* @escapeNotVerified */ $block->getProductUrl() ?>"
+               title="<?= $block->escapeHtml($block->getProductName()) ?>"
+               tabindex="-1"
+               class="product-item-photo">
+                <?php else:?>
+                <span class="product-item-photo">
+            <?php endif;?>
+            <?= $block->getImage($block->getProductForThumbnail(), 'cart_page_product_thumbnail')->toHtml() ?>
+            <?php if ($block->hasProductUrl()):?>
+            </a>
+        <?php else: ?>
+            </span>
+        <?php endif; ?>
+            <div class="product-item-details">
+                <strong class="product-item-name">
+                    <?php if ($block->hasProductUrl()):?>
+                        <a href="<?= /* @escapeNotVerified */ $block->getProductUrl() ?>"><?= $block->escapeHtml($block->getProductName()) ?></a>
+                    <?php else: ?>
+                        <?= $block->escapeHtml($block->getProductName()) ?>
+                    <?php endif; ?>
+                </strong>
+                <?php if ($_options = $block->getOptionList()):?>
+                    <dl class="item-options">
+                        <?php foreach ($_options as $_option) : ?>
+                            <?php $_formatedOptionValue = $block->getFormatedOptionValue($_option) ?>
+                            <dt><?= $block->escapeHtml($_option['label']) ?></dt>
+                            <dd>
+                                <?php if (isset($_formatedOptionValue['full_view'])): ?>
+                                    <?= /* @escapeNotVerified */ $_formatedOptionValue['full_view'] ?>
+                                <?php else: ?>
+                                    <?= /* @escapeNotVerified */ $_formatedOptionValue['value'] ?>
+                                <?php endif; ?>
+                            </dd>
+                        <?php endforeach; ?>
+                    </dl>
+                <?php endif;?>
+                <?php if ($messages = $block->getMessages()): ?>
+                    <?php foreach ($messages as $message): ?>
+                        <div class="cart item message <?= /* @escapeNotVerified */ $message['type'] ?>"><div><?= $block->escapeHtml($message['text']) ?></div></div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                <?php $addInfoBlock = $block->getProductAdditionalInformationBlock(); ?>
+                <?php if ($addInfoBlock): ?>
+                    <?= $addInfoBlock->setItem($_item)->toHtml() ?>
+                <?php endif;?>
+            </div>
+        </td>
+
+        <?php if ($canApplyMsrp): ?>
+            <td class="col msrp" data-th="<?= $block->escapeHtml(__('Price')) ?>">
+                <span class="pricing msrp">
+                    <span class="msrp notice"><?= /* @escapeNotVerified */ __('See price before order confirmation.') ?></span>
+                    <?php $helpLinkId = 'cart-msrp-help-' . $_item->getId(); ?>
+                    <a href="#" class="action help map" id="<?= /* @escapeNotVerified */ ($helpLinkId) ?>" data-mage-init='{"addToCart":{"helpLinkId": "#<?= /* @escapeNotVerified */ $helpLinkId ?>","productName": "<?= /* @escapeNotVerified */ $product->getName() ?>","showAddToCart": false}}'>
+                        <span><?= /* @escapeNotVerified */ __("What's this?") ?></span>
+                    </a>
+                </span>
+            </td>
+        <?php else: ?>
+            <td class="col price" data-th="<?= $block->escapeHtml(__('Price')) ?>">
+                <?= $block->getUnitPriceHtml($_item) ?>
+            </td>
+        <?php endif; ?>
+        <td class="col qty" data-th="<?= $block->escapeHtml(__('Qty')) ?>">
+            <div class="field qty">
+                <label class="label" for="cart-<?= /* @escapeNotVerified */ $_item->getId() ?>-qty">
+                    <span><?= /* @escapeNotVerified */ __('Qty') ?></span>
+                </label>
+                <div class="control qty">
+                    <input id="cart-<?= /* @escapeNotVerified */ $_item->getId() ?>-qty"
+                           name="cart[<?= /* @escapeNotVerified */ $_item->getId() ?>][qty]"
+                           data-cart-item-id="<?= /* @escapeNotVerified */ $_item->getSku() ?>"
+                           value="<?= /* @escapeNotVerified */ $block->getQty() ?>"
+                           type="number"
+                           size="4"
+                           title="<?= $block->escapeHtml(__('Qty')) ?>"
+                           class="input-text qty"
+                           data-validate="{required:true,'validate-greater-than-zero':true}"
+                           data-role="cart-item-qty"/>
+                </div>
+            </div>
+        </td>
+
+        <td class="col subtotal" data-th="<?= $block->escapeHtml(__('Subtotal')) ?>">
+            <?php if ($canApplyMsrp): ?>
+                <span class="cart msrp subtotal">--</span>
+            <?php else: ?>
+                <?= $block->getRowTotalHtml($_item) ?>
+            <?php endif; ?>
+        </td>
+    </tr>
+    <tr class="item-actions">
+        <td colspan="100">
+            <div class="actions-toolbar">
+                <?= /* @escapeNotVerified */ $block->getActions($_item) ?>
+            </div>
+        </td>
+    </tr>
+    </tbody>
+<?php endif; ?>

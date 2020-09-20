@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!--
+  ~  Mage-World
+  ~
+  ~ @category    Mage-World
+  ~ @package     MW
+  ~ @author      Dreyar Developer (dreyar@mage-world.com)
+  ~
+  ~ @copyright   Copyright (c) 2018 Mage-World (https://www.mage-world.com/)
+  -->
+
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <carriers>
+            <purolator>
+                <delay_day>1</delay_day>
+                <purolatorexpress_delay_day>1</purolatorexpress_delay_day>
+                <purolatorground_delay_day>1</purolatorground_delay_day>
+                <purolatorexpressus_delay_day>1</purolatorexpressus_delay_day>
+                <purolatorgroundus_delay_day>1</purolatorgroundus_delay_day>
+                <purolatorexpressinternational_delay_day>1</purolatorexpressinternational_delay_day>
+            </purolator>
+        </carriers>
+    </default>
+</config>
