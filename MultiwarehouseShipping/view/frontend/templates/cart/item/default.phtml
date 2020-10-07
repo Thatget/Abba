@@ -12,6 +12,7 @@ $outStockThreshold = $outStockQtyhelper->getStockQty() ?? 1;
 /*@saurabh*/
 
 $_item = $block->getItem();
+$a = $_item->getProduct()->getStatus();
 
 $product = $_item->getProduct();
 $isVisibleProduct = $product->isVisibleInSiteVisibility();
@@ -75,48 +76,85 @@ foreach ($wharehouseBlock->getWarehouse() as $_wh){
                     </style>
                 </div>
 
-<!--                --><?php //if ($messages = $block->getMultiMessages()): ?>
-<!--                    --><?php //foreach ($messages as $message): ?>
-<!--                        <div class="cart item message --><?//= /* @escapeNotVerified */ $message['type'] ?><!--">-->
-<!--                            <div>--><?//= $block->escapeHtml($message['text']) ?><!--</div>-->
-<!--                        </div>-->
-<!--                    --><?php //endforeach; ?>
-<!--                --><?php //endif; ?>
+                <!--                --><?php //if ($messages = $block->getMultiMessages()): ?>
+                <!--                    --><?php //foreach ($messages as $message): ?>
+                <!--                        <div class="cart item message --><?//= /* @escapeNotVerified */ $message['type'] ?><!--">-->
+                <!--                            <div>--><?//= $block->escapeHtml($message['text']) ?><!--</div>-->
+                <!--                        </div>-->
+                <!--                    --><?php //endforeach; ?>
+                <!--                --><?php //endif; ?>
 
                 <?php
                 $error = false;
                 $errorContent = "";
-                 foreach ($_item->getData("multiwarehouse_options") as $option):
-                foreach ($block->getProductBasedOnColor($_item->getProductId(), $_item->getData('color_id')) as $pd) :
-                 ?>
-                    <?php
-                    $warehouse_item_data = $wharehouseBlock->getWareHouseQuantity($warehouses[$option['warehouse']], $pd['entity_id']);
-                    $warehouse_quantity  = @round($warehouse_item_data[0]['available_qty'],2) - $outStockThreshold;
-                    if ((!($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0){
-                        $error = true;
-                        $errorContent = "This product is out of stock";
-                        break;
-                    }elseif((($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0) {
-                        $error = true;
-                        $errorContent = "This product is out of stock";
-                        break;
-                    }
+                $sizeOld = array();
+                $error2 = array();
+                $disableL = array();
+                $checkDP = array();
+
+                $j = 0;
+                foreach ($_item->getData("multiwarehouse_options") as $option):
+                    foreach ($block->getProductBasedOnColor($_item->getProductId(), $_item->getData('color_id')) as $pd) :
+                        ?>
+                        <?php
+                        if($pd["status"] == "2"){
+                            $sizeOld[$j] = $pd["size"];
+                            $error2[$j][$sizeOld[$j]] = true;
+                            if($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0) $checkDP[$sizeOld[$j]] = $sizeOld[$j];
+                            $disableLable[$j][$sizeOld[$j]] = "This product (Size: ". $block->getOptionLabelByValue('size',$sizeOld[$j]).") disabled";
+                        }
+                        $warehouse_item_data = $wharehouseBlock->getWareHouseQuantity($warehouses[$option['warehouse']], $pd['entity_id']);
+                        $warehouse_quantity  = @round($warehouse_item_data[0]['available_qty'],2) - $outStockThreshold;
+                        if ((!($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0){
+                            $error = true;
+                            $errorContent = "This product is out of stock";
+                        }elseif((($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0) {
+                            $error = true;
+                            $errorContent = "This product is out of stock";
+                        }
+                        ?>
+                    <?php endforeach; ?>
+                    <?php $j++;
                     ?>
                 <?php endforeach; ?>
-                <?php endforeach; ?>
                 <?php
-                    if ($error){
-                        ?>
-                        <div class="cart item message error" >
-                            <div>
-                                <?php
-                                echo $errorContent;
-                                ?>
-                            </div>
+                if ($error){
+                    ?>
+                    <div class="cart item message error" >
+                        <div>
+                            <?php
+                            echo $errorContent;
+                            ?>
                         </div>
+                    </div>
+                    <?php
+                }
+                foreach($checkDP as  $key => $value){
+                    ?>
+                    <div class="cart item message error" >
                         <?php
-                    }
-                 ?>
+                        $con = true;
+                        foreach($disableLable as $content){
+                            if(array_key_exists ($key ,$content ) && $con ){
+                                ?>
+                                <div>
+                                    <a style="color:red" href="<?php echo $block->getUrl("mwmultiwarehouse/cart/delete",
+                                        array("product_id" => $_item->getProductId(), 'color'=>$_item->getData("color_id"),
+                                            'size'=>$key))?>" data-title="Remove" class="action action-delete">Remove:
+                                        <?php
+                                        echo $content[$key];
+                                        ?>
+                                    </a>;
+                                </div>
+                                <?php
+                                $con = false;
+                            }
+                        }
+                        ?>
+                    </div>
+                    <?php
+                }
+                ?>
                 <?php $addInfoBlock = $block->getProductAdditionalInformationBlock(); ?>
                 <?php if ($addInfoBlock): ?>
                     <?= $addInfoBlock->setItem($_item)->toHtml() ?>
@@ -142,55 +180,60 @@ foreach ($wharehouseBlock->getWarehouse() as $_wh){
                         <dd class="">
                             <ul>
                                 <?php foreach ($block->getProductBasedOnColor($_item->getProductId(), $_item->getData('color_id')) as $pd) :
-                                ?>
+                                    ?>
                                     <?php $warehouse_item_data = $wharehouseBlock->getWareHouseQuantity($warehouses[$option['warehouse']], $pd['entity_id']);
 
-                                        $warehouse_quantity  = @round($warehouse_item_data[0]['available_qty'],2) - $outStockThreshold;
+                                    $warehouse_quantity  = @round($warehouse_item_data[0]['available_qty'],2) - $outStockThreshold;
 
                                     ?>
                                     <li>
-                                        <?php $size_label = $block->getOptionLabelByValue('size', $pd['size']); ?>
-                                        <span class="size"><?php echo $size_label ?></span>
-                                        <span class="price"><?php echo $block->formatPrice($pd['price']);?></span>
-                                        <input min="0" class="input-text qty multiwarehouse-item-qty"
-                                               data-cart-item-id="<?php echo $block->getItemIdBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) ?>"
-                                               data-price="<?php echo $pd['price'] ?>"
-                                               data-color="<?php echo $_item->getData('color_id') ?>"
-                                               data-product-id="<?php echo $_item->getProductId() ?>"
-                                               data-size="<?php echo $pd['size'] ?>"
-                                               data-warehouse="<?php echo $option['warehouse'] ?>"
-                                               type="number"
-                                               name="<?php echo $block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse'])?"cart-update":"cart-add" ?>"
-                                               value="<?php echo $block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) ?>"
-                                               data-max="<?php echo ($warehouse_quantity>=0)?$warehouse_quantity:0; ?>" <?php echo ($warehouse_quantity <= 0) ? 'disabled' : ''; ?>/>
+                                    <?php $size_label = $block->getOptionLabelByValue('size', $pd['size']); ?>
+                                    <span class="size"><?php echo $size_label ?></span>
+                                    <span class="price"><?php echo $block->formatPrice($pd['price']);?></span>
+                                    <input min="0" class="input-text qty multiwarehouse-item-qty"
+                                           data-cart-item-id="<?php echo $block->getItemIdBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) ?>"
+                                           data-price="<?php echo $pd['price'] ?>"
+                                           data-color="<?php echo $_item->getData('color_id') ?>"
+                                           data-product-id="<?php echo $_item->getProductId() ?>"
+                                           data-size="<?php echo $pd['size'] ?>"
+                                           data-warehouse="<?php echo $option['warehouse'] ?>"
+                                           type="number"
+                                           name="<?php echo $block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse'])?"cart-update":"cart-add" ?>"
+                                           value="<?php echo $block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) ?>"
+                                           data-max="<?php echo ($warehouse_quantity>=0)?$warehouse_quantity:0; ?>"
+                                        <?php echo ($warehouse_quantity <= 0) ? ' disabled ' : ''; ?>
+                                        <?php echo (array_key_exists($pd['size'],$checkDP)) ? ' disabled' : ''; ?>
+
+
+                                    />
+                                    <?php
+                                    if ((!($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0){
+                                        ?>
+                                        <a href="<?php echo $block->getUrl("mwmultiwarehouse/cart/delete", array("product_id" => $_item->getProductId(), 'color'=>$_item->getData("color_id"),'size'=>$pd['size'],'warehouse'=>$option['warehouse']))?>"
+                                           data-title="Remove" class="action action-delete">
+                                            <h5 class="qty-available"><?php echo __("Out Stock")?></h5>
+                                            <span class="qty-available">
+<!--                                                    <img src="--><?php //echo $this->getViewFileUrl('MW_MultiwarehouseShipping::images/remove.jpg'); ?><!--" />-->
+                                                    <h6 style="color: red;font-weight: bold;">Remove</h6>
+                                                </span>
+                                        </a>
                                         <?php
-                                        if ((!($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0){
-                                           ?>
-                                            <a href="<?php echo $block->getUrl("mwmultiwarehouse/cart/delete", array("product_id" => $_item->getProductId(), 'color'=>$_item->getData("color_id"),'size'=>$pd['size'],'warehouse'=>$option['warehouse']))?>"
-                                               data-title="Remove" class="action action-delete">
-                                                <h5 class="qty-available"><?php echo __("Out Stock")?></h5>
-                                                <span class="qty-available">
+                                    }elseif((($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0) {
+                                        ?>
+                                        <a href="<?php echo $block->getUrl("mwmultiwarehouse/cart/delete", array("product_id" => $_item->getProductId(), 'color'=>$_item->getData("color_id"),'size'=>$pd['size'],'warehouse'=>$option['warehouse']))?>"
+                                           data-title="Remove" class="action action-delete">
+                                            <h5 class="qty-available"><?= $warehouse_quantity ?></h5>
+                                            <span class="qty-available">
 <!--                                                    <img src="--><?php //echo $this->getViewFileUrl('MW_MultiwarehouseShipping::images/remove.jpg'); ?><!--" />-->
                                                     <h6 style="color: red;font-weight: bold;">Remove</h6>
                                                 </span>
-                                            </a>
-                                            <?php
-                                        }elseif((($warehouse_quantity>0))&($block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > $warehouse_quantity)&$block->getQtyBySizeAndWarehouse($_item, $pd['size'], $option['warehouse']) > 0) {
-                                            ?>
-                                            <a href="<?php echo $block->getUrl("mwmultiwarehouse/cart/delete", array("product_id" => $_item->getProductId(), 'color'=>$_item->getData("color_id"),'size'=>$pd['size'],'warehouse'=>$option['warehouse']))?>"
-                                               data-title="Remove" class="action action-delete">
-                                                <h5 class="qty-available"><?= $warehouse_quantity ?></h5>
-                                                <span class="qty-available">
-<!--                                                    <img src="--><?php //echo $this->getViewFileUrl('MW_MultiwarehouseShipping::images/remove.jpg'); ?><!--" />-->
-                                                    <h6 style="color: red;font-weight: bold;">Remove</h6>
-                                                </span>
-                                            </a>
-                                            <?php
-                                        }else{
-                                            ?>
+                                        </a>
+                                        <?php
+                                    }else{
+                                        ?>
                                         <span class="qty-available"><?= ($warehouse_quantity > 0) ? $warehouse_quantity: 'Out Stock' ; ?></span>
-                                    </li>
-                                <?php } endforeach; ?>
+                                        </li>
+                                    <?php } endforeach; ?>
                             </ul>
                         </dd>
                     </dl>
@@ -240,7 +283,7 @@ foreach ($wharehouseBlock->getWarehouse() as $_wh){
         }
         .cart.table-wrapper .data.table .item-info .product-item-details .action-links a{
             color: #568dc4;
-             position: relative;
+            position: relative;
             z-index: 10;
         }
 

@@ -26,6 +26,7 @@ class Delete extends \Magento\Checkout\Controller\Cart
         $productId = (int)$this->getRequest()->getParam('product_id');
         $color = $this->getRequest()->getParam('color');
         $size = $this->getRequest()->getParam('size');
+		$warehouse = $this->getRequest()->getParam('warehouse');
 
         if ($productId) {
             try {
@@ -35,15 +36,19 @@ class Delete extends \Magento\Checkout\Controller\Cart
                         if ($item->getProduct()->getId() == $productId) {
                             if ($this->getItemType($item,'color') == $color) {
                                 if ($this->getItemType($item, 'size') == $size) {
-                                    $warehouse = $this->getRequest()->getParam('warehouse');
-                                    $options = $item->getProduct()->getTypeInstance(true)->getOrderOptions($item->getProduct());
-                                    if (($options['options'][0]['label'] == 'Warehouse') && ($options['options'][0]['value'] == $warehouse)) {
-                                        $this->cart->removeItem($item->getItemId())->save();
-                                    }
+									if($warehouse){
+										$options = $item->getProduct()->getTypeInstance(true)->getOrderOptions($item->getProduct());
+										if (($options['options'][0]['label'] == 'Warehouse') && ($options['options'][0]['value'] == $warehouse)) {
+											$this->cart->removeItem($item->getItemId())->save();
+										}
+									}else{
+										$this->cart->removeItem($item->getItemId());
+									}
                                 }
                             }
                         }
                     }
+					if(!$warehouse)$this->cart->save();
                 }else{
                     foreach ($items as $item) {
                         if ($item->getProduct()->getId() == $productId) {
