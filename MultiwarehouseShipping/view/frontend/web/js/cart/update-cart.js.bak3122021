@@ -32,6 +32,7 @@ define([
             cartFormSelector: '#form-validate',
             shippingFormSelector: '#shipping-zip-form',
             cartTableSelector: '#shopping-cart-table',
+            cartItemInfoSelector: '.item-info',
             updateItemSelector: 'cart-update',
             addItemSelector: 'cart-add',
             messageSelector: '.messages',
@@ -58,7 +59,8 @@ define([
                 self.options.oldInputVal = $(this).val();
             });
 
-            $(self.options.cartFormSelector).on('change', 'input[type="number"]', function () {
+            $(self.options.cartFormSelector).on('blur', 'input[type="number"]', function (event) {
+                event.preventDefault();
                 if (self._validateInput(this)) {
                     self._ajaxUpdateCartItems(this);
                 } else {
@@ -138,7 +140,7 @@ define([
                     if (res.updated == true) {
                         var regionSelector = $(self.options.shippingFormSelector).find('select[name="region_id"]'),
                             regionSelectorVal = regionSelector.val(),
-                            cartTable = $(self.options.cartTableSelector),
+                            cartTable = $(input).closest(self.options.cartItemInfoSelector),
                             rowTotalElement = null,
                             sizeInputsSelector = null,
                             sizeTotalSelector = null,
@@ -227,6 +229,9 @@ define([
 
                                     //if all warehouses are removed then remove color item
                                     $('#tr-' + trSelector).remove();
+                                    if (chloopBreaked == false) {
+                                        $(input).closest('tbody').remove();
+                                    }
 
                                     if ($(self.options.cartTableSelector).find('tr.item-info').length == 0) {
                                         //if there are no items then show empty cart
@@ -248,15 +253,56 @@ define([
                                 //as qty is set zero, so this can be added to cart
                                 $(input).attr('name', self.options.addItemSelector);
                             }
+                        }if ($(input).val() <= parseInt($(input).attr("data-max"))){
+                            $(input).siblings("a").remove();
+                            $(input).siblings(".qty-available").remove();
+                            $(input).parent("li").append("<span class='qty-available'>"+$(input).attr("data-max")+"</span>");
+                        }if (!$(input).parents(".cart-wh-size-qty").find("a").length){
+                            $(input).parents(".cart-wh-size-qty").siblings(".product-item-details").children(".error").remove();
                         }
 
                         if (res.added_item_id) {
                             $(input).attr(self.options.cartItemIdData, res.added_item_id);
                             $(input).attr('name', self.options.updateItemSelector);
                         }
-
+                        //refresh error message in default.phtml
+                        if ($(input).val() <= parseInt($(input).attr("data-max"))){
+                            $(input).siblings("a").remove();
+                            $(input).siblings(".qty-available").remove();
+                            $(input).parent("li").append("<span class='qty-available'>"+$(input).attr("data-max")+"</span>");
+                        }if (!$(input).parents(".cart-wh-size-qty").find("a").length){
+                            $(input).parents(".cart-wh-size-qty").siblings(".product-item-details").children(".error").remove();
+                        }
+                        //end refresh error message in default.phtml
+                        //remove error messsage "@The requested qty is not available" in checkout page
+                        if (!$(input).parents("#shopping-cart-table").find("[data-title=Remove]").length){
+                            $("[data-ui-id=checkout-cart-validationmessages-message-error]").parents(".messages").remove();
+                        }
+                        //end remove "@The requested qty is not available" message
                         //refresh cart totals
                         self._refreshCartTotals();
+                        /**
+                         * Texx
+                         */
+                        require(['Magento_Checkout/js/action/get-totals',
+                            'Magento_Customer/js/customer-data'], function (getTotalsAction, customerData) {
+                            // The mini cart reloading
+                            customerData.reload(sections, true);
+
+                            // The totals summary block reloading
+                            var deferred = $.Deferred();
+                            getTotalsAction([], deferred);
+
+                            //Display error if found after jquery
+                            var messages = $.cookieStorage.get('mage-messages');
+                            if (!_.isEmpty(messages)) {
+                                customerData.set('messages', {messages: messages});
+                                $.cookieStorage.set('mage-messages', '');
+                            }
+                        });
+                        /**
+                         * Texx
+                         */
                         self._refreshMiniCart();
                     }
 
@@ -278,6 +324,17 @@ define([
                     $("input[data-max='0']").prop('disabled', true);
                 }
             });
+        },
+
+        onHiddenChange: function (isHidden) {
+            var self = this;
+
+            // Hide message block if needed
+            if (isHidden) {
+                setTimeout(function () {
+                    $('.message .message-error .error').hide('blind', {}, 500);
+                }, 500);
+            }
         },
 
         _refreshMiniCart: function () {
@@ -411,7 +468,7 @@ define([
         },
 
         _validateInput: function (input) {
-            
+
             if (/^(\d)+$/.test($(input).val())) {
                 return true;
             }
